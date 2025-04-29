@@ -1,0 +1,69 @@
+name: MERN App with PostgreSQL CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15
+        ports:
+          - 5432:5432
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: myapp_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/myapp_test
+
+    strategy:
+      matrix:
+        node-version: [18.x]
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Use Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v3
+      with:
+        node-version: ${{ matrix.node-version }}
+
+    - name: Wait for PostgreSQL
+      run: |
+        until pg_isready -h localhost -p 5432 -U postgres; do
+          echo "Waiting for postgres..."
+          sleep 3
+        done
+
+    # Install backend dependencies
+    - name: Install server dependencies
+      working-directory: ./server
+      run: npm install
+
+    # Run backend tests (e.g., integration with Postgres)
+    - name: Run backend tests
+      working-directory: ./server
+      run: npm test
+
+    # Install frontend dependencies
+    - name: Install client dependencies
+      working-directory: ./client
+      run: npm install
+
+    # Build frontend
+    - name: Build React frontend
+      working-directory: ./client
+      run: npm run build
